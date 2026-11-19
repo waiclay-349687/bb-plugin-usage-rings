@@ -107,6 +107,12 @@ bb plugin reload usage-rings
 `lib/token-totals.ts` is adapted from Usage Bar (MIT); see
 `THIRD_PARTY_NOTICES.md`.
 
+## Related BB Plugins
+
+- [bb-plugin-worktree-lineage](https://github.com/waiclay-349687/bb-plugin-worktree-lineage): Worktree & branch-lineage sidebar thread list with smooth motion, Settled shelf, attention jump shortcuts, and hover briefings
+- [bb-plugin-session-cockpit](https://github.com/waiclay-349687/bb-plugin-session-cockpit): Top-right thread context cockpit with grouped Progress, Usage, Context files, Servers, Scripts, and Connectors
+- [bb-plugin-usage-rings](https://github.com/waiclay-349687/bb-plugin-usage-rings) (this plugin): Bottom-left sidebar usage rings with pace tracking across providers including Antigravity
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
