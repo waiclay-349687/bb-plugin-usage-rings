@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 SDK 的 experimental_ThreadContextCardRow / experimental_Icon / experimental_ProviderIcon; 依赖 lib/usage 的配速、hooks/use-motion 的 Details 开关;
+ * [INPUT]: 依赖 SDK 的 experimental_ThreadContextCardRow / experimental_Icon / experimental_ProviderIcon; 依赖 lib/usage 的配速、lib/i18n 的时长与窗口名、hooks/use-language 的文案、hooks/use-motion 的 Details 开关;
  *          依赖 components/card-section、window-row、sections、collapse
  * [OUTPUT]: 对外提供 UsageCard (一个提供方的卡片内容: 头部 · Limits (按窗口名前缀分区) · 可折叠的 Details (Codex 的 Resets/Credits · Activity) · Details 开关行 · 刷新行) 与 ProviderPresentation / UsageCardProps 类型
  * [POS]: components 的卡片组合层, 版式照 BB 线程上下文卡片 (分区 + 原生行); 悬浮卡片与设置页共用同一套;
@@ -12,8 +12,10 @@ import {
   experimental_ThreadContextCardRow as CardRow,
 } from "@get-bb/plugin-sdk/app";
 import { DURATION, transition } from "../lib/motion.ts";
-import { formatSpan, groupWindows, paceOf, type ProviderUsage } from "../lib/usage.ts";
+import { formatSpan, localizeWindowName, type Lang, type Messages } from "../lib/i18n.ts";
+import { groupWindows, paceOf, type ProviderUsage } from "../lib/usage.ts";
 import { cn } from "../lib/utils.ts";
+import { useI18n } from "../hooks/use-language.ts";
 import { useDetailsOpen, useReducedMotion } from "../hooks/use-motion.ts";
 import { CardSection } from "./card-section.tsx";
 import { Collapse } from "./collapse.tsx";
@@ -41,14 +43,19 @@ export interface UsageCardProps {
   animateFill?: boolean;
 }
 
-function updatedCopy(now: number, updatedAt: number | null, error: string | null): string {
-  if (error) return "Refresh failed";
-  if (updatedAt === null) return "Not updated yet";
-  return now - updatedAt < 60_000 ? "Updated just now" : `Updated ${formatSpan(now - updatedAt)} ago`;
+function updatedCopy(t: Messages, lang: Lang, now: number, updatedAt: number | null, error: string | null): string {
+  if (error) return t.refreshFailed;
+  if (updatedAt === null) return t.notUpdated;
+  return now - updatedAt < 60_000 ? t.updatedJustNow : t.updatedAgo(formatSpan(now - updatedAt, lang));
 }
 
 export function UsageCard({ usage, provider, now, updatedAt, error, refreshing, onRefresh, animateFill = true }: UsageCardProps) {
-  const alert = usage.status === "error" ? usage.message : usage.staleMessage ?? null;
+  const { t, lang } = useI18n();
+  // 中文模式不显示后端给的英文原文, 换成概括说法
+  const alert =
+    usage.status === "error"
+      ? lang === "en" ? usage.message : t.loadFailed
+      : usage.staleMessage === undefined ? null : t.staleNote(usage.staleMessage);
   const stale = usage.status === "ok" && usage.staleMessage !== undefined;
   const showPlan = usage.planLabel !== null && !provider.name.toLowerCase().includes(usage.planLabel.toLowerCase());
   const [detailsOpen, setDetailsOpen] = useDetailsOpen();
@@ -69,7 +76,7 @@ export function UsageCard({ usage, provider, now, updatedAt, error, refreshing, 
 
       {alert ? (
         <p className="mx-2 mb-1.5 mt-0 rounded-md bg-destructive/10 px-2 py-1 text-[11px] leading-4 text-destructive-text animate-in fade-in-0 duration-200 motion-reduce:animate-none">
-          {stale ? `${alert} Showing the last reading.` : alert}
+          {alert}
         </p>
       ) : null}
 
@@ -78,9 +85,9 @@ export function UsageCard({ usage, provider, now, updatedAt, error, refreshing, 
         ? groupWindows(usage.windows).map((group, groupIndex, groups) => {
             const offset = groups.slice(0, groupIndex).reduce((count, previous) => count + previous.items.length, 0);
             return (
-              <CardSection key={group.name ?? "limits"} title={group.name ?? "Limits"} first={groupIndex === 0}>
+              <CardSection key={group.name ?? "limits"} title={group.name === null ? t.limits : localizeWindowName(group.name, lang)} first={groupIndex === 0}>
                 {group.items.map(({ window, title }, index) => (
-                  <WindowRow key={window.label} window={window} title={title} pace={paceOf(window, now)} index={offset + index} stale={stale} animateFill={animateFill} />
+                  <WindowRow key={window.label} window={window} title={localizeWindowName(title, lang)} pace={paceOf(window, now)} index={offset + index} stale={stale} animateFill={animateFill} />
                 ))}
               </CardSection>
             );
@@ -105,8 +112,8 @@ export function UsageCard({ usage, provider, now, updatedAt, error, refreshing, 
               style={{ transition: transition(reduced, [["transform", DURATION.fast]]) }}
             />
           }
-          label={detailsOpen ? "Hide details" : "Details"}
-          trailing={detailsOpen ? undefined : codex ? "Resets · Credits · Activity" : "Activity"}
+          label={detailsOpen ? t.hideDetails : t.details}
+          trailing={detailsOpen ? undefined : codex ? t.detailsSummaryCodex : t.detailsSummary}
           onClick={() => setDetailsOpen(!detailsOpen)}
         />
         <CardRow
@@ -117,8 +124,8 @@ export function UsageCard({ usage, provider, now, updatedAt, error, refreshing, 
               className={cn("size-3.5 shrink-0 text-muted-foreground", refreshing && "animate-spin [animation-direction:reverse] motion-reduce:animate-none")}
             />
           }
-          label={refreshing ? "Refreshing…" : "Refresh"}
-          trailing={<span className={cn(error && "text-destructive-text")}>{updatedCopy(now, updatedAt, error)}</span>}
+          label={refreshing ? t.refreshing : t.refresh}
+          trailing={<span className={cn(error && "text-destructive-text")}>{updatedCopy(t, lang, now, updatedAt, error)}</span>}
           onClick={onRefresh}
         />
       </div>

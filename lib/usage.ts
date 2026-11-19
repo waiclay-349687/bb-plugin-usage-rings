@@ -1,11 +1,12 @@
 /**
- * [INPUT]: 无外部依赖; 输入是 bb `/api/v1/system/usage-limits` (即 sdk.system.usageLimits) 的原始响应
- * [OUTPUT]: 对外提供 normalizeUsage / mergeLastKnown / paceOf / paceCopy / usedTone / paceTone / primaryWindow / formatSpan / formatTokens / windowTitle / groupWindows 及其类型:
+ * [INPUT]: 依赖 lib/i18n 的文案与时长格式; 输入是 limits RPC (汇总的 BB 用量来源) 的原始响应
+ * [OUTPUT]: 对外提供 normalizeUsage / mergeLastKnown / paceOf / paceCopy / usedTone / paceTone / primaryWindow / formatTokens / windowTitle / groupWindows 及其类型:
  *           把原始响应归一成"提供方 → 额度窗口"视图, 按 Synara 的算法算配速 (已过时间下限 5%, 按窗口结束时预计用量分档); 界面统一按"已用"表达
  * [POS]: lib 的纯逻辑核心, 无 IO、无 React; 配速与配色规则的唯一真相源; 消费者: hooks/use-usage-limits.ts、components/*;
  *        与 components 的边界: 这里只算数和拼文案, 不碰 DOM
  * [PROTOCOL]: 变更时更新此头部,然后检查所在目录 CLAUDE.md
  */
+import { formatSpan, MESSAGES, type Lang } from "./i18n.ts";
 
 export type WindowKind = "five-hour" | "daily" | "weekly" | "custom";
 
@@ -153,17 +154,18 @@ function isOnPace(deltaPercent: number): boolean {
   return Math.round(Math.abs(deltaPercent)) === 0;
 }
 
-/** 进度条下面那一行: 左边余量/赤字, 右边结论 */
-export function paceCopy(pace: Pace): { amount: string | null; outlook: string | null } {
+/** 进度条下面那一行: 左边余量/赤字, 右边结论; 文案按界面语言取 */
+export function paceCopy(pace: Pace, lang: Lang = "en"): { amount: string | null; outlook: string | null } {
+  const t = MESSAGES[lang];
   if (pace.exhausted) {
-    return { amount: "Limit reached", outlook: pace.resetsInMs === null ? null : `Back in ${formatSpan(pace.resetsInMs)}` };
+    return { amount: t.limitReached, outlook: pace.resetsInMs === null ? null : t.backIn(formatSpan(pace.resetsInMs, lang)) };
   }
-  // 算不出配速时不重复标题行里的"N% used"
+  // 算不出配速时不重复标题行里的"已用 N%"
   if (pace.deltaPercent === null || pace.status === null) return { amount: null, outlook: null };
   const rounded = Math.round(Math.abs(pace.deltaPercent));
-  const amount = isOnPace(pace.deltaPercent) ? "On pace" : pace.deltaPercent > 0 ? `${rounded}% in deficit` : `${rounded}% in reserve`;
-  if (pace.status !== "behind") return { amount, outlook: "Lasts until reset" };
-  return { amount, outlook: pace.runsOutInMs === null ? null : `Runs out in ${formatSpan(pace.runsOutInMs)}` };
+  const amount = isOnPace(pace.deltaPercent) ? t.onPace : pace.deltaPercent > 0 ? t.deficit(rounded) : t.reserve(rounded);
+  if (pace.status !== "behind") return { amount, outlook: t.lastsUntilReset };
+  return { amount, outlook: pace.runsOutInMs === null ? null : t.runsOutIn(formatSpan(pace.runsOutInMs, lang)) };
 }
 
 /** 环与进度条填充色看用量: 用到 75% 琥珀、90% 红 (即 Synara 的剩 25% / 10%) */
@@ -181,18 +183,6 @@ export function primaryWindow(windows: readonly UsageWindow[]): UsageWindow | nu
   let best: UsageWindow | null = null;
   for (const w of windows) if (best === null || w.usedPercent > best.usedPercent) best = w;
   return best;
-}
-
-/** 4d 23h / 10h 43m / 35m / <1m, 向下取整到分钟 */
-/** 4d 23h / 2h 5m / 35m; units = 1 时只留最大单位 (4d), 用在窄处 */
-export function formatSpan(ms: number, units: 1 | 2 = 2): string {
-  const totalMinutes = Math.floor(Math.max(0, ms) / MINUTE_MS);
-  if (totalMinutes < 1) return "<1m";
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  const minutes = totalMinutes % 60;
-  const parts = days > 0 ? [`${days}d`, `${hours}h`] : hours > 0 ? [`${hours}h`, `${minutes}m`] : [`${minutes}m`];
-  return parts.slice(0, units).join(" ");
 }
 
 const COMPACT_SMALL = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });

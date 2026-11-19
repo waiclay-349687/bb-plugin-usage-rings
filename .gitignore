@@ -5,3 +5,4 @@ node_modules/
 *.jpg
 *.png
 .claude/
+!docs/screenshots/*.png

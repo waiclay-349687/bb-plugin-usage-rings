@@ -1,7 +1,7 @@
 /**
- * [INPUT]: 依赖 SDK 的 experimental_ThreadContextCardRow / experimental_Icon / experimental_useRpcQuery / experimental_useRpcMutation; 依赖 rpc.ts 契约;
+ * [INPUT]: 依赖 SDK 的 experimental_ThreadContextCardRow / experimental_Icon / experimental_useRpcQuery / experimental_useRpcMutation; 依赖 rpc.ts 契约; 依赖 lib/i18n 的时长格式、hooks/use-language 的文案;
  *          依赖 sonner (BB 运行时垫片, 提示进 BB 通知中心); 依赖 components/ui/button (BB 组件库按钮)、components/card-section
- * [OUTPUT]: 对外提供 CodexSections (Resets: 每行常驻按钮, 未解锁灰掉并写 "Unlocks at 90%", 解锁后 Use, 两步确认 + 幂等键; Credits) 与 ActivitySection (24h/7d/30d 的 token 与会话数)
+ * [OUTPUT]: 对外提供 CodexSections (Resets: 每行常驻按钮, 未解锁灰掉并写解锁门槛, 解锁后为"使用/Use", 两步确认 + 幂等键; Credits) 与 ActivitySection (24h/7d/30d 的 token 与会话数)
  * [POS]: components 的数据分区, 卡片打开时挂载; 数据由 rail-rings 预热、随额度刷新一起过期 (hooks/use-usage-limits), 打开即有; 消费者: usage-card.tsx; 与 usage-card 的边界: 这里只画分区内容与重置交互
  * [PROTOCOL]: 变更时更新此头部,然后检查所在目录 CLAUDE.md
  */
@@ -15,8 +15,10 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { rpcContract, TOKEN_PERIODS, type CodexAccount, type ResetCredit, type ResetOutcome } from "../rpc.ts";
 import { DURATION, transition } from "../lib/motion.ts";
-import { formatSpan, formatTokens } from "../lib/usage.ts";
+import { formatSpan, type Messages } from "../lib/i18n.ts";
+import { formatTokens } from "../lib/usage.ts";
 import { cn } from "../lib/utils.ts";
+import { useI18n } from "../hooks/use-language.ts";
 import { useAnimateIn, useReducedMotion } from "../hooks/use-motion.ts";
 import { CardSection, SubLine } from "./card-section.tsx";
 import { Button } from "./ui/button.tsx";
@@ -26,12 +28,9 @@ const CREDIT_PRICE_USD = 0.04;
 const CREDITS = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-const OUTCOME_COPY: Record<ResetOutcome, string> = {
-  reset: "Codex limits reset.",
-  nothingToReset: "Codex limits do not need a reset right now.",
-  noCredit: "No banked resets available.",
-  alreadyRedeemed: "That reset was already used.",
-};
+function outcomeCopy(t: Messages, outcome: ResetOutcome): string {
+  return { reset: t.outcomeReset, nothingToReset: t.outcomeNothingToReset, noCredit: t.outcomeNoCredit, alreadyRedeemed: t.outcomeAlreadyRedeemed }[outcome];
+}
 
 function RowIcon({ name }: { name: string }) {
   return <Icon name={name} fallback="Circle" aria-hidden={true} className="size-3.5 shrink-0 text-muted-foreground" />;
@@ -41,19 +40,20 @@ function RowIcon({ name }: { name: string }) {
 
 /** 重置成功后 onUsageChanged 让外层重新读额度, 圆环随之回满 */
 export function CodexSections({ onUsageChanged }: { onUsageChanged(): void }) {
+  const { t } = useI18n();
   const query = experimental_useRpcQuery({ contract: rpcContract, method: "codex_account", input: { refresh: false } });
   const account = query.data;
   if (!account) {
     return query.isLoading ? (
-      <CardSection title="Resets">
-        <SubLine>Reading Codex account…</SubLine>
+      <CardSection title={t.resets}>
+        <SubLine>{t.readingAccount}</SubLine>
       </CardSection>
     ) : null;
   }
   if (account.status === "unavailable") {
     return (
-      <CardSection title="Resets">
-        <SubLine>{`Codex account details are unavailable: ${account.message}`}</SubLine>
+      <CardSection title={t.resets}>
+        <SubLine>{t.accountUnavailable(account.message)}</SubLine>
       </CardSection>
     );
   }
@@ -67,13 +67,13 @@ export function CodexSections({ onUsageChanged }: { onUsageChanged(): void }) {
         }}
       />
       {account.credits ? (
-        <CardSection title="Credits">
+        <CardSection title={t.credits}>
           <CardRow
             leading={<RowIcon name="Layers" />}
-            label="Balance"
+            label={t.balance}
             trailing={
               account.credits.unlimited
-                ? "Unlimited"
+                ? t.unlimited
                 : `${CREDITS.format(account.credits.balance)} · ≈ ${USD.format(account.credits.balance * CREDIT_PRICE_USD)}`
             }
           />
@@ -104,15 +104,15 @@ function readAttempt(accountId: string): Attempt | null {
 }
 
 /** 提示行: 说清门槛和当前用量, 未解锁的行才不会像坏了 */
-function resetHint(account: OkAccount): string {
+function resetHint(t: Messages, account: OkAccount): string {
   const { resetThresholdPercent: threshold, peakUsedPercent: peak } = account;
   // 一行放得下 (约 40 字符), 否则 "5%" 会孤零零掉到第二行
-  if (account.canUseReset) return `Limit at ${Math.round(peak ?? threshold)}% · resets are ready to use`;
-  const now = peak === null ? "" : ` · now ${Math.round(peak)}%`;
-  return `A limit must reach ${threshold}%${now}`;
+  if (account.canUseReset) return t.hintReady(Math.round(peak ?? threshold));
+  return t.hintLocked(threshold, peak === null ? null : Math.round(peak));
 }
 
 function ResetsSection({ account, onDone }: { account: OkAccount; onDone(): void }) {
+  const { t, lang } = useI18n();
   const [attempt, setAttempt] = useState<Attempt | null>(() => readAttempt(account.accountId));
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const mutation = experimental_useRpcMutation({ contract: rpcContract, method: "codex_use_reset" });
@@ -134,7 +134,7 @@ function ResetsSection({ account, onDone }: { account: OkAccount; onDone(): void
 
   async function apply(creditId: string | undefined) {
     if (attempt && attempt.creditId !== creditId) {
-      toast.error("Retry the previous reset before choosing another one.");
+      toast.error(t.retryPreviousFirst);
       return;
     }
     // 每次确认一个幂等键, 先落盘再发请求: 网络中断后重试的是同一次, 不会扣两次
@@ -150,18 +150,18 @@ function ResetsSection({ account, onDone }: { account: OkAccount; onDone(): void
       const { outcome } = await mutation.mutate({ accountId: account.accountId, ...current });
       localStorage.removeItem(attemptKey(account.accountId));
       setAttempt(null);
-      if (outcome === "reset" || outcome === "alreadyRedeemed") toast.success(OUTCOME_COPY[outcome]);
-      else toast.info(OUTCOME_COPY[outcome]);
+      if (outcome === "reset" || outcome === "alreadyRedeemed") toast.success(outcomeCopy(t, outcome));
+      else toast.info(outcomeCopy(t, outcome));
       onDone();
     } catch (cause) {
       const reason = cause instanceof Error && cause.message.trim() !== "" ? cause.message.trim().replace(/[.!?]?$/, ".") + " " : "";
-      toast.error("Reset result not confirmed", { description: `${reason}Retry the same attempt; it will not spend a second reset.` });
+      toast.error(t.resetNotConfirmed, { description: t.resetNotConfirmedDetail(reason) });
     }
   }
 
   return (
-    <CardSection title="Resets" trailing={`${resets?.availableCount ?? 0} available`}>
-      <SubLine>{resetHint(account)}</SubLine>
+    <CardSection title={t.resets} trailing={t.available(resets?.availableCount ?? 0)}>
+      <SubLine>{resetHint(t, account)}</SubLine>
       {rows.map((credit, index) => {
         const isPendingRow = pendingMissing && index === 0;
         const id = isPendingRow ? attempt?.creditId : credit?.id;
@@ -170,14 +170,14 @@ function ResetsSection({ account, onDone }: { account: OkAccount; onDone(): void
         const number = pendingMissing ? index : index + 1;
         const state: ResetState =
           mutation.isPending && pending ? "applying" : pending ? "retry" : !account.canUseReset ? "locked" : confirmId === key ? "confirm" : "idle";
-        const expires = credit?.expiresAt ? `expires in ${formatSpan(credit.expiresAt - Date.now(), 1)}` : null;
+        const expires = credit?.expiresAt ? t.expiresIn(formatSpan(credit.expiresAt - Date.now(), lang, 1)) : null;
         return (
           <CardRow
             key={isPendingRow ? "pending" : key}
             leading={<RowIcon name={state === "locked" ? "Lock" : "SquareUnlock02"} />}
             label={
               <span className="flex min-w-0 items-baseline gap-1.5">
-                <span className="shrink-0">{isPendingRow ? "Unconfirmed reset" : credit ? `Reset ${number}` : "Next reset"}</span>
+                <span className="shrink-0">{isPendingRow ? t.unconfirmedReset : credit ? t.resetN(number) : t.nextReset}</span>
                 {expires ? <span className="truncate text-[11px] text-subtle-foreground">{expires}</span> : null}
               </span>
             }
@@ -201,9 +201,9 @@ function ResetsSection({ account, onDone }: { account: OkAccount; onDone(): void
 }
 
 type ResetState = "idle" | "locked" | "confirm" | "applying" | "retry";
-const RESET_LABEL: Record<Exclude<ResetState, "locked">, string> = { idle: "Use", confirm: "Confirm", applying: "Applying…", retry: "Retry" };
-
 function ResetButton({ state, threshold, disabled, onClick }: { state: ResetState; threshold: number; disabled: boolean; onClick(): void }) {
+  const { t } = useI18n();
+  const label = { locked: t.unlocksAt(threshold), idle: t.use, confirm: t.confirm, applying: t.applying, retry: t.retry }[state];
   return (
     <Button
       type="button"
@@ -219,7 +219,7 @@ function ResetButton({ state, threshold, disabled, onClick }: { state: ResetStat
       {state === "applying" ? (
         <span aria-hidden="true" className="size-2 animate-spin rounded-full border border-current border-r-transparent motion-reduce:animate-none" />
       ) : null}
-      {state === "locked" ? `Unlocks at ${threshold}%` : RESET_LABEL[state]}
+      {label}
       {state === "confirm" ? <Countdown /> : null}
     </Button>
   );
@@ -241,6 +241,7 @@ function Countdown() {
 // ---------- Activity: 24h / 7d / 30d ----------
 
 export function ActivitySection({ providerId }: { providerId: string }) {
+  const { t } = useI18n();
   const query = experimental_useRpcQuery({ contract: rpcContract, method: "token_totals", input: null });
   const totals = query.data;
   const collecting = totals?.state === "collecting";
@@ -252,12 +253,12 @@ export function ActivitySection({ providerId }: { providerId: string }) {
     return () => window.clearInterval(timer);
   }, [collecting, query.refetch]);
 
-  const note = !totals ? null : collecting ? "counting…" : "BB sessions";
+  const note = !totals ? null : collecting ? t.counting : t.bbSessions;
   const entry = totals?.byProvider[providerId];
   return (
-    <CardSection title="Activity" trailing={note ?? undefined}>
+    <CardSection title={t.activity} trailing={note ?? undefined}>
       {!totals ? (
-        <SubLine>{query.isLoading ? "Counting BB sessions…" : "Activity is unavailable."}</SubLine>
+        <SubLine>{query.isLoading ? t.countingSessions : t.activityUnavailable}</SubLine>
       ) : (
         TOKEN_PERIODS.map((period) => {
           const value = entry?.[period] ?? { tokens: 0, sessions: 0 };
@@ -265,13 +266,13 @@ export function ActivitySection({ providerId }: { providerId: string }) {
             <CardRow
               key={period}
               leading={<RowIcon name="ChartColumn" />}
-              label={period}
-              trailing={`${formatTokens(value.tokens)} tokens · ${value.sessions === 1 ? "1 session" : `${value.sessions} sessions`}`}
+              label={t.period[period]}
+              trailing={t.activityValue(formatTokens(value.tokens), value.sessions)}
             />
           );
         })
       )}
-      {totals?.error ? <SubLine>{totals.error}</SubLine> : null}
+      {totals?.error ? <SubLine>{t.activityError(totals.error)}</SubLine> : null}
     </CardSection>
   );
 }

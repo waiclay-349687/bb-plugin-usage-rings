@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 hooks/use-rail-slot 的挂载点、hooks/use-usage-limits 的额度数据、hooks/use-hover-card 的共用卡片开合、hooks/use-follow-anchor 的跟随锚点; 依赖 components/presentation 的提供方名称图标;
+ * [INPUT]: 依赖 hooks/use-rail-slot 的挂载点、hooks/use-usage-limits 的额度数据、hooks/use-hover-card 的共用卡片开合、hooks/use-follow-anchor 的跟随锚点、hooks/use-language 的语言 (挂载时把宿主设置镜像到本地); 依赖 components/presentation 的提供方名称图标;
  *          依赖 @radix-ui/react-popover (BB 运行时共享, 定位/层级/Esc 与 BB 弹层一致); 依赖 SDK 的 experimental_useRpcQuery 预热卡片分区数据 (与 sections.tsx 同一查询键, 共用缓存)
  * [OUTPUT]: 对外提供 RailRings: app overlay 组件, 把每个有额度数据的提供方画成一个圆环, portal 进侧边栏 rail 底部; 整列圆环共用一张悬浮卡片, 底边贴着当前圆环, 换圆环时平移过去
  * [POS]: components 的装配层; 消费者: app.tsx (experimental_appOverlay);
@@ -13,6 +13,7 @@ import { experimental_useRpcQuery } from "@get-bb/plugin-sdk/app";
 import { rpcContract } from "../rpc.ts";
 import { useFollowAnchor } from "../hooks/use-follow-anchor.ts";
 import { useHoverCard } from "../hooks/use-hover-card.ts";
+import { useI18n, useLanguageSync } from "../hooks/use-language.ts";
 import { useRailSlot } from "../hooks/use-rail-slot.ts";
 import { useNow, useUsageLimits } from "../hooks/use-usage-limits.ts";
 import { DURATION, MOTION } from "../lib/motion.ts";
@@ -30,6 +31,8 @@ export function RailRings() {
   const present = useProviderPresentation();
   const portalScope = usePortalScopeProps();
   const card = useHoverCard<string>();
+  useLanguageSync();
+  const { t } = useI18n();
   // 卡片底边贴着当前圆环; 换圆环时锚点滑过去, 卡片跟着平移
   const anchor = useFollowAnchor(card.triggerElement(card.active), card.open);
   // 悬浮卡片里的分区在卡片打开时才挂载; 提前把它们的数据取好, 第一次悬停卡片就不会在弹出后再长高
@@ -65,7 +68,7 @@ export function RailRings() {
     <div {...portalScope} className="flex flex-col items-center pb-1.5 pt-1">
       <Popover.Root open={card.open && active !== null} onOpenChange={card.onOpenChange}>
         <Popover.Anchor virtualRef={anchor} />
-        <div ref={card.anchorRef} role="group" aria-label="Agent usage limits" className="flex flex-col gap-1.5">
+        <div ref={card.anchorRef} role="group" aria-label={t.ringsGroup} className="flex flex-col gap-1.5">
           {limits.providers.map((usage) => (
             <UsageRing key={usage.providerId} usage={usage} provider={present(usage.providerId)} trigger={card.triggerProps(usage.providerId)} />
           ))}
@@ -81,7 +84,7 @@ export function RailRings() {
               collisionPadding={8}
               // 每帧重读锚点: 锚点在两个圆环之间滑动时卡片才会跟着走
               updatePositionStrategy="always"
-              aria-label={`${present(active.providerId).name} usage`}
+              aria-label={t.cardAria(present(active.providerId).name)}
               className={cn("z-50 w-72 rounded-md border bg-popover text-popover-foreground shadow-md outline-none", MOTION.popover, MOTION.reduce)}
             >
               <MorphHeight morphKey={active.providerId}>

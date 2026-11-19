@@ -1,7 +1,7 @@
+import { formatSpan } from "../lib/i18n.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  formatSpan,
   formatTokens,
   normalizeUsage,
   paceCopy,
@@ -140,11 +140,11 @@ test("primaryWindow picks the most used window, first on ties", () => {
 });
 
 test("formatting helpers", () => {
-  assert.equal(formatSpan(0), "<1m");
-  assert.equal(formatSpan(35 * 60_000 + 59_000), "35m");
-  assert.equal(formatSpan((4 * 24 + 23) * HOUR + 59 * 60_000), "4d 23h");
-  assert.equal(formatSpan((12 * 24 + 17) * HOUR, 1), "12d");
-  assert.equal(formatSpan(2 * HOUR + 5 * 60_000, 1), "2h");
+  assert.equal(formatSpan(0, "en"), "<1m");
+  assert.equal(formatSpan(35 * 60_000 + 59_000, "en"), "35m");
+  assert.equal(formatSpan((4 * 24 + 23) * HOUR + 59 * 60_000, "en"), "4d 23h");
+  assert.equal(formatSpan((12 * 24 + 17) * HOUR, "en", 1), "12d");
+  assert.equal(formatSpan(2 * HOUR + 5 * 60_000, "en", 1), "2h");
   assert.equal(formatTokens(512), "512");
   assert.equal(formatTokens(12_345), "12.3K");
   assert.equal(formatTokens(10_400_000), "10M");

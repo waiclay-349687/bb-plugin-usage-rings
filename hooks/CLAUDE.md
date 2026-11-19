@@ -6,6 +6,7 @@ use-usage-limits.ts: useUsageLimits 每 5 分钟、以及窗口重新可见且�
 use-rail-slot.ts: useRailSlot 在 `nav[data-sidebar-navigation-placement="rail"]` 末尾追加独占容器（落在 rail 底部、Settings 之上），MutationObserver + rAF 合并跟随 nav 重建，卸载时移除
 use-hover-card.ts: useHoverCard 整列圆环共用一张悬浮卡片：悬停 100ms 打开、离开 200ms 收起，指针移进卡片保持打开；卡片开着时划到别的圆环立即换内容（给出 switchedFrom 供滑入方向、switchCount 供淡出层计时）；鼠标点击不做事，键盘 Enter 打开并移焦进卡片、Esc 把焦点还给圆环，触屏点按开合；只认键盘焦点，悬停打开不抢焦点（同 BB 会话页上下文圆环）；triggerElement 给出圆环元素供定位
 use-follow-anchor.ts: useFollowAnchor 给 Popover.Anchor 的虚拟锚点：渲染时就指向当前圆环（首次打开即定位正确）；卡片开着时换圆环，纵向用 easeOut 在 200ms 内从此刻所在位置滑到新圆环，关着时换圆环直接到位；减少动态效果下不滑
+use-language.ts: useI18n 给出当前语言与文案（所有组件共用一个外部 store，设置一改全部同时换；auto 时监听 <html lang> 与浏览器语言变化）；useLanguageSync 把宿主插件设置（useSettings，拿不到时退回 language RPC）镜像到 localStorage；useSetLanguage 先本地生效再经 set_language RPC 写回宿主；readStoredMessages 给 app.tsx 注册设置页标题时同步取文案
 use-motion.ts: useReducedMotion（系统“减少动态效果”）、useAnimateIn（挂载两帧后为真，驱动从 0 过渡到目标值）、useDetailsOpen（Details 展开状态存 localStorage，所有卡片共享）
 
 ## 边界

@@ -1,89 +1,93 @@
-# bb-plugin-usage-rings
+# Usage Rings for bb
 
-Agent plan limits as rings at the bottom of BB's sidebar rail, just above
-Settings: one ring per provider that reports usage.
+> **English** | [简体中文](README.zh-CN.md)
 
-Limits come from every source of BB's usage protocol (`provider-usage.v1`),
-the same sources BB's own Provider usage card reads: BB's built-in Codex,
-Claude Code and ACP collectors, any usage plugin you install, and an
-**Antigravity** source this plugin adds. The Antigravity source runs the local
-`agy` CLI's built-in `/usage` command (zero turns, zero tokens; no login files
-are read), shows Gemini and Claude/GPT five-hour and weekly windows, and also
-appears in BB's own usage card.
+**See every agent's plan limit at a glance.** One ring per provider sits at the bottom of bb's sidebar rail; hover it to see how much is used, when it resets, and whether you are on pace to make it.
 
-- **Ring length**: how much of that provider's tightest limit is used.
-- **Ring colour**: green, amber from 75% used, red from 90%. A used-up
-  limit fills the whole ring in red; a failed refresh greys it and adds a
-  red dot while the last reading stays visible.
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/codex-details.png" alt="Codex card with Details open: weekly limit, banked resets, credits and activity"></td>
+    <td width="50%"><img src="docs/screenshots/antigravity.png" alt="Google Antigravity card: Gemini and Claude/GPT five-hour and weekly windows"><br><br><img src="docs/screenshots/claude-dark.png" alt="Claude Code card in dark theme, with two windows in deficit"></td>
+  </tr>
+</table>
 
-Hover a ring for its card, styled like BB's own thread context card. The card
-sits beside the ring you hover, its bottom edge level with the ring. All rings
-share one card: move to another ring and the card slides to it and eases to
-the new height while the old contents fade out and the new ones fade in. Clicking a ring does
-nothing; with the keyboard, Enter opens the card and moves focus into it, and
-Escape returns to the ring. On touch screens a tap opens and closes it.
+## Highlights
 
-The card shows **Limits** first. **Details** (closed by default, remembered
-for every card) opens Resets, Credits and Activity above its toggle row, so the
-toggle stays under the pointer while the card grows upward.
+- **Every provider, one source of truth**: reads all sources of bb's usage protocol (`provider-usage.v1`), the same ones bb's own Provider usage card reads: built-in Codex, Claude Code and ACP collectors, plus any usage plugin you install.
+- **Antigravity included**: adds an Antigravity source that runs the local `agy` CLI's built-in `/usage` command. Zero turns, zero tokens, no login files read. It shows Gemini and Claude/GPT five-hour and weekly windows and also appears in bb's own usage card.
+- **Rings you can read from across the room**: the ring length is the tightest limit's share used. Green, amber from 75%, red from 90%. A used-up limit fills the ring in red; a failed refresh greys it and adds a red dot while the last reading stays.
+- **Pace, not just percentages**: every window gets a full-width bar with an even-pace marker, how far in reserve or deficit you are, and when it runs out at your current rate.
+- **Codex extras**: banked resets with a guarded two-step **Use**, and your credit balance in dollars.
+- **Activity from bb itself**: tokens and sessions for 24 hours, 7 days and 30 days, counted from the usage bb already records.
 
-- **Limits**: for each window the share used, a bar with an even-pace marker,
-  time to reset, how far in reserve or deficit you are, and when the window
-  runs out at your current rate. Windows named "Group · Window" (Antigravity's
-  Gemini and Claude/GPT) get a section per group.
-- **Resets** (Codex): banked resets with their expiry, each with a button.
-  Until a limit is 90% used the button is greyed out and reads "Unlocks at
-  90%"; after that it is a two-step **Use**.
-- **Credits** (Codex): the balance with its dollar value. Resets and credits
-  are read through the Codex CLI's `app-server`; no login files are read.
-- **Activity**: tokens and session counts for 24 hours, 7 days and 30 days,
-  counted from the token usage BB already records for its threads. Sessions
-  run outside BB are not counted.
+<img align="right" width="48" src="docs/screenshots/rings.png" alt="Three rings in the sidebar rail above Settings">
+
+## The hover card
+
+Hover a ring and its card opens beside it, styled like bb's own thread context card, bottom edge level with the ring. All rings share one card: move to another ring and the card slides there, eases to the new height, and swaps its contents with a short fade.
+
+- **Limits** (always shown): each window's share used, a bar with an even-pace marker, time to reset, reserve or deficit, and when it runs out. Windows named "Group · Window" (Antigravity's Gemini and Claude/GPT) get a section per group.
+- **Details** (closed by default, remembered for every card) opens **above** its toggle row, so the toggle stays under your pointer while the card grows upward:
+  - **Resets** (Codex): banked resets with their expiry, each with a button. Until a limit is 90% used the button is greyed out and reads "Unlocks at 90%"; then it becomes a two-step **Use**.
+  - **Credits** (Codex): the balance and its dollar value. Resets and credits come from the Codex CLI's `app-server`; no login files are read.
+  - **Activity**: tokens and sessions for 24 h, 7 d and 30 d. Sessions run outside bb are not counted.
 - **Refresh**: re-reads every source and shows when they were last read.
 
-The plugin's settings page shows the same cards for every provider.
+Clicking a ring does nothing. With the keyboard, Enter opens the card and moves focus into it, and Escape returns to the ring. On touch screens a tap opens and closes it. The plugin's settings page shows the same cards for every provider.
 
-## Pace
+<details>
+<summary><b>How pace is calculated</b></summary>
 
 For a window of known length (five-hour, daily, weekly), following Synara:
 
-- elapsed share = time since the window opened ÷ window length, counted as at
-  least 5% so early use does not read as an emergency
-- reserve / deficit = used % − elapsed share
-- projected = used % ÷ elapsed share: ≤ 80% ahead, ≤ 100% on track, otherwise
-  behind, with "runs out in" when that lands before the reset
-- a reserve or deficit that rounds to 0% always reads "On pace" and counts as
-  on track: no warning colour and no "runs out in"
+| Quantity | Rule |
+| --- | --- |
+| Elapsed share | time since the window opened ÷ window length, counted as at least 5% so early use does not read as an emergency |
+| Reserve / deficit | used % − elapsed share |
+| Projected use | used % ÷ elapsed share: ≤ 80% **ahead**, ≤ 100% **on track**, otherwise **behind** |
+| Runs out in | shown when you are behind and the projection runs out before the reset |
+| On pace | a reserve or deficit that rounds to 0% always reads "On pace" and counts as on track: no warning colour, no "runs out in" |
 
-## Use reset safety
+</details>
 
-The first click arms the button for four seconds; the second runs it. Each
-confirmed attempt gets an idempotency key stored before the request is sent,
-so a result that never arrives can only be retried as the same attempt, never
-spent twice. The server re-reads usage first and refuses if the account
-changed or no limit is at 90% or more. The 90% guard is this plugin's (borrowed
-from Synara) so a reset is not wasted while plenty is left; Codex's own client
-lets you try at any time and answers "does not need a reset" when it doesn't.
+<details>
+<summary><b>Why Use reset can't spend a reset twice</b></summary>
+
+| Guard | What it does |
+| --- | --- |
+| Two-step confirm | The first click arms the button for four seconds; the second runs it. |
+| Idempotency key | Each confirmed attempt gets a key stored *before* the request is sent. A result that never arrives can only be retried as the same attempt, never spent twice. |
+| Server re-check | The server re-reads usage first and refuses if the account changed or no limit is at 90% or more. |
+| 90% guard | The plugin's own rule (borrowed from Synara), so a reset is not wasted while plenty is left. Codex's own client lets you try any time and answers "does not need a reset". |
+
+</details>
+
+## Language
+
+The plugin speaks English and Simplified Chinese, and never mixes the two: in English mode no Chinese appears anywhere in the rings, cards or settings page, and in Chinese mode every label, status, duration and window name is Chinese (only brand, model and plan names such as Codex, Gemini or Pro stay as they are).
+
+| Setting | Behaviour |
+| --- | --- |
+| `auto` (default) | Follows bb's language: `zh*` → Simplified Chinese, anything else → English |
+| `en` | Always English |
+| `zh` | Always Simplified Chinese |
+
+Switch it on the plugin's settings page (**Language**: Auto / English / 简体中文; takes effect at once) or from the CLI:
+
+```sh
+bb plugin config usage-rings set language zh   # or en, auto
+```
 
 ## Design
 
-Colours, type sizes, radii and surfaces come from BB's theme and component
-library; motion uses BB's durations and curves (see `lib/motion.ts`). The card
-enters and leaves like BB's popovers, opens 100 ms after the pointer arrives
-and closes 200 ms after it leaves. Nothing loops in the sidebar, and with
-"reduce motion" on only short fades remain.
+Colours, type sizes, radii and surfaces come from bb's theme and component library; motion uses bb's durations and curves (see `lib/motion.ts`). The card enters and leaves like bb's popovers, opens 100 ms after the pointer arrives and closes 200 ms after it leaves. Nothing loops in the sidebar, and with "reduce motion" on only short fades remain.
 
 ## Requirements and limits
 
-- Rings show with the **Rail** navigation (BB's default). Top list and compact
-  layouts have no rail; the settings page still works.
-- The rings mount into BB's rail element
-  (`nav[data-sidebar-navigation-placement="rail"]`); if a BB update changes
-  it, the rings stop showing and nothing else breaks.
-- Codex resets and credits need the `codex` CLI on the BB server's PATH (or `CODEX_BIN`).
-- The Antigravity ring needs a provider with `antigravity` in its id registered in
-  BB and the `agy` CLI signed in (looked up in `AGY_BIN`, `~/.local/bin`,
-  `/opt/homebrew/bin`, `/usr/local/bin`, then PATH).
+- Rings show with the **Rail** navigation (bb's default). Top list and compact layouts have no rail; the settings page still works.
+- The rings mount into bb's rail element (`nav[data-sidebar-navigation-placement="rail"]`). If a bb update changes it, the rings stop showing and nothing else breaks.
+- Codex resets and credits need the `codex` CLI on the bb server's PATH (or `CODEX_BIN`).
+- The Antigravity ring needs a provider with `antigravity` in its id registered in bb, and the `agy` CLI signed in (looked up in `AGY_BIN`, `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, then PATH).
 
 ## Install
 
@@ -104,14 +108,13 @@ npm run check            # typecheck + tests + bb plugin build
 bb plugin reload usage-rings
 ```
 
-`lib/token-totals.ts` is adapted from Usage Bar (MIT); see
-`THIRD_PARTY_NOTICES.md`.
+`lib/token-totals.ts` is adapted from Usage Bar (MIT); see `THIRD_PARTY_NOTICES.md`.
 
 ## Related BB Plugins
 
-- [bb-plugin-worktree-lineage](https://github.com/waiclay-349687/bb-plugin-worktree-lineage): Worktree & branch-lineage sidebar thread list with smooth motion, Settled shelf, attention jump shortcuts, and hover briefings
-- [bb-plugin-session-cockpit](https://github.com/waiclay-349687/bb-plugin-session-cockpit): Top-right thread context cockpit with grouped Progress, Usage, Context files, Servers, Scripts, and Connectors
-- [bb-plugin-usage-rings](https://github.com/waiclay-349687/bb-plugin-usage-rings) (this plugin): Bottom-left sidebar usage rings with pace tracking across providers including Antigravity
+- [bb-plugin-worktree-lineage](https://github.com/waiclay-349687/bb-plugin-worktree-lineage): Worktree & branch-lineage sidebar thread list with smooth motion, Settled shelf, attention-jump shortcuts, and hover briefings.
+- [bb-plugin-session-cockpit](https://github.com/waiclay-349687/bb-plugin-session-cockpit): Top-right thread cockpit with Progress, Usage & live Context breakdown, real-time Context files tracking, Servers, Scripts, and Connectors.
+- [bb-plugin-usage-rings](https://github.com/waiclay-349687/bb-plugin-usage-rings) (this plugin): Sidebar usage rings with pace tracking across providers, including Antigravity.
 
 ## License
 

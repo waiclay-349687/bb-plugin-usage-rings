@@ -13,8 +13,10 @@ sections.tsx: CodexSections 与 ActivitySection。Resets：每行右侧常驻按
 tone.ts: 状态 → BB 主题色类（text / bg）
 control.ts: GHOST_CONTROL，圆环的交互反馈 = BB ghost 按钮（悬停 state-hover 即时出现、离开 150ms 淡出，卡片显示它时 state-active）+ 按下 state-active；卡片里的行用 BB 原生行自带反馈
 presentation.ts: useProviderPresentation，providerId → BB 里的名称、图标、品牌色
-settings-overview.tsx: SettingsOverview，插件设置页总览，每个提供方一张 UsageCard（外壳同悬浮卡片，不带阴影）
+settings-overview.tsx: SettingsOverview，插件设置页：顶部语言切换器（自动 / English / 简体中文，点了立即生效并写回宿主设置）+ 总览，每个提供方一张 UsageCard（外壳同悬浮卡片，不带阴影）
 ui/button.tsx、ui/motion.ts: BB 组件库 vendored（按钮与控件悬停过渡），L3 豁免
+
+所有界面文字都经 hooks/use-language 的 useI18n 取自 lib/i18n，组件里不写字面文案。
 
 ## 边界
 本模块负责: 视图、交互与动效的落地

@@ -1,13 +1,15 @@
 /**
  * [INPUT]: 依赖 @get-bb/plugin-sdk 的 defineRpcContract、zod; 依赖 lib/usage-protocol 的 usageSchema (BB 用量协议的单个读数)
- * [OUTPUT]: 对外提供 rpcContract 与 TokenTotals / CodexAccount / ResetOutcome 类型: 前端 ↔ 后端的 RPC 契约 (limits / token_totals / codex_account / codex_use_reset)
+ * [OUTPUT]: 对外提供 rpcContract 与 TokenTotals / CodexAccount / ResetOutcome 类型: 前端 ↔ 后端的 RPC 契约 (limits / token_totals / codex_account / codex_use_reset / language / set_language)
  * [POS]: 插件根的前后端共享契约 (前端需要运行时契约对象, 故不能留在 server.ts);
- *        消费者: server.ts (注册 handler)、hooks/use-usage-limits.ts (limits)、components/sections.tsx (读取与执行重置、token 统计)、components/rail-rings.tsx (预热)
+ *        消费者: server.ts (注册 handler)、hooks/use-usage-limits.ts (limits)、components/sections.tsx (读取与执行重置、token 统计)、components/rail-rings.tsx (预热)、hooks/use-language.ts (读写界面语言)
  * [PROTOCOL]: 变更时更新此头部,然后检查所在目录 CLAUDE.md
  */
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { usageSchema } from "./lib/usage-protocol.ts";
+
+const languageSchema = z.enum(["auto", "en", "zh"]);
 
 const periodSchema = z.object({ tokens: z.number().min(0), sessions: z.number().int().min(0) });
 
@@ -62,6 +64,9 @@ export const rpcContract = defineRpcContract({
       .strict(),
     output: z.object({ outcome: z.enum(RESET_OUTCOMES) }),
   },
+  /** 界面语言设置 (auto / en / zh), 存在宿主的插件设置里, bb plugin config 改的是同一个值 */
+  language: { input: z.null(), output: z.object({ language: languageSchema }) },
+  set_language: { input: z.object({ language: languageSchema }).strict(), output: z.object({ language: languageSchema }) },
 });
 
 export type TokenTotals = z.infer<typeof tokenTotalsSchema>;

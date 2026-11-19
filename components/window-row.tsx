@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 lib/usage 的配速与文案、lib/motion 的动效参数、hooks/use-motion 的 useAnimateIn / useReducedMotion
+ * [INPUT]: 依赖 lib/usage 的配速与文案、lib/i18n 的时长与窗口名、hooks/use-language 的文案、lib/motion 的动效参数、hooks/use-motion 的 useAnimateIn / useReducedMotion
  * [OUTPUT]: 对外提供 WindowRow: 一个额度窗口 = 标题行 (窗口名 · 已用% · 重置倒计时) + 整行宽 6px 进度条 (带匀速刻度) + 余量/结论行;
  *           title 可只给分组后的短名, animateFill 关掉从 0 填充
  * [POS]: components 的行原语, 悬浮卡片与设置页共用; 消费者: usage-card.tsx; 与 usage-card 的边界: 这里只画一个窗口;
@@ -7,8 +7,10 @@
  * [PROTOCOL]: 变更时更新此头部,然后检查所在目录 CLAUDE.md
  */
 import { DURATION, EASE_OUT, transition } from "../lib/motion.ts";
-import { formatSpan, paceCopy, paceTone, usedTone, windowTitle, type Pace, type UsageWindow } from "../lib/usage.ts";
+import { formatSpan, localizeWindowName } from "../lib/i18n.ts";
+import { paceCopy, paceTone, usedTone, windowTitle, type Pace, type UsageWindow } from "../lib/usage.ts";
 import { cn } from "../lib/utils.ts";
+import { useI18n } from "../hooks/use-language.ts";
 import { useAnimateIn, useReducedMotion } from "../hooks/use-motion.ts";
 import { TONE_BG, TONE_TEXT } from "./tone.ts";
 
@@ -27,16 +29,17 @@ export function WindowRow({
   stale: boolean;
   animateFill?: boolean;
 }) {
+  const { t, lang } = useI18n();
   const drawn = useAnimateIn();
   const shown = drawn || !animateFill;
   const reduced = useReducedMotion();
   const used = Math.min(100, Math.max(0, pace.usedPercent));
   const tone = usedTone(used);
-  const copy = paceCopy(pace);
+  const copy = paceCopy(pace, lang);
   const delay = index * DURATION.stagger;
   // 刻度 = 匀速时此刻应用到的位置, 填充越过它就是用快了
   const marker = pace.expectedUsedPercent !== null && !pace.exhausted ? Math.min(100, Math.max(0, pace.expectedUsedPercent)) : null;
-  const full = windowTitle(window); // 提示与读屏用全名 (含分组前缀)
+  const full = localizeWindowName(windowTitle(window), lang); // 提示与读屏用全名 (含分组前缀)
 
   return (
     <div className={cn("px-2 py-1.5", stale && "opacity-50")} style={{ transition: transition(reduced, [["opacity", 200]]) }}>
@@ -44,16 +47,16 @@ export function WindowRow({
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 text-xs leading-5">
         <span className="flex min-w-0 items-baseline gap-1.5">
           <span className="truncate font-medium text-foreground">{title}</span>
-          <span className={cn("shrink-0 tabular-nums", tone === "good" ? "text-foreground" : TONE_TEXT[tone])}>{Math.round(used)}% used</span>
+          <span className={cn("shrink-0 tabular-nums", tone === "good" ? "text-foreground" : TONE_TEXT[tone])}>{t.usedPercent(Math.round(used))}</span>
         </span>
         <span className="tabular-nums text-muted-foreground">
-          {pace.resetsInMs === null ? "Reset time not reported" : `Resets in ${formatSpan(pace.resetsInMs)}`}
+          {pace.resetsInMs === null ? t.resetUnknown : t.resetsIn(formatSpan(pace.resetsInMs, lang))}
         </span>
       </div>
 
       <div
         role="meter"
-        aria-label={`${full} used`}
+        aria-label={t.meterLabel(full)}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(used)}
@@ -72,7 +75,7 @@ export function WindowRow({
         {marker !== null && pace.status !== null ? (
           // 刻度两侧挖一道底色缺口, 落在填充上也看得清 (Synara 的做法); 两处外壳都是 bg-popover
           <div
-            title="Even pace"
+            title={t.evenPace}
             className="absolute inset-y-0 flex w-1.5 -translate-x-1/2 justify-center bg-popover"
             style={{ left: `${marker}%`, opacity: shown ? 1 : 0, transition: transition(reduced, [["opacity", DURATION.fast, undefined, delay + 300]]) }}
           >
