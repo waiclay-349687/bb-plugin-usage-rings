@@ -15,7 +15,7 @@
 
 - **Every provider, one source of truth**: reads all sources of bb's usage protocol (`provider-usage.v1`), the same ones bb's own Provider usage card reads: built-in Codex, Claude Code and ACP collectors, plus any usage plugin you install.
 - **Antigravity included**: adds an Antigravity source that runs the local `agy` CLI's built-in `/usage` command. Zero turns, zero tokens, no login files read. It shows Gemini and Claude/GPT five-hour and weekly windows and also appears in bb's own usage card.
-- **Rings you can read from across the room**: the ring length is the tightest limit's share used. Green, amber from 75%, red from 90%. A used-up limit fills the ring in red; a failed refresh greys it and adds a red dot while the last reading stays.
+- **Rings you can read from across the room**: the ring length is the tightest limit's share used. Green, amber from 75%, red from 90% (both adjustable). A used-up limit fills the ring in red; a failed refresh greys it and adds a red dot while the last reading stays.
 - **Pace, not just percentages**: every window gets a full-width bar with an even-pace marker, how far in reserve or deficit you are, and when it runs out at your current rate.
 - **Codex extras**: banked resets with a guarded two-step **Use**, and your credit balance in dollars.
 - **Activity from bb itself**: tokens and sessions for 24 hours, 7 days and 30 days, counted from the usage bb already records.
@@ -28,7 +28,7 @@ Hover a ring and its card opens beside it, styled like bb's own thread context c
 
 - **Limits** (always shown): each window's share used, a bar with an even-pace marker, time to reset, reserve or deficit, and when it runs out. Windows named "Group · Window" (Antigravity's Gemini and Claude/GPT) get a section per group.
 - **Details** (closed by default, remembered for every card) opens **above** its toggle row, so the toggle stays under your pointer while the card grows upward:
-  - **Resets** (Codex): banked resets with their expiry, each with a button. Until a limit is 90% used the button is greyed out and reads "Unlocks at 90%"; then it becomes a two-step **Use**.
+  - **Resets** (Codex): banked resets with their expiry, each with a button. Until a limit reaches the unlock threshold (90% by default) the button is greyed out and reads "Unlocks at 90%"; then it becomes a two-step **Use**.
   - **Credits** (Codex): the balance and its dollar value. Resets and credits come from the Codex CLI's `app-server`; no login files are read.
   - **Activity**: tokens and sessions for 24 h, 7 d and 30 d. Sessions run outside bb are not counted.
 - **Refresh**: re-reads every source and shows when they were last read.
@@ -58,9 +58,31 @@ For a window of known length (five-hour, daily, weekly), following Synara:
 | Two-step confirm | The first click arms the button for four seconds; the second runs it. |
 | Idempotency key | Each confirmed attempt gets a key stored *before* the request is sent. A result that never arrives can only be retried as the same attempt, never spent twice. |
 | Server re-check | The server re-reads usage first and refuses if the account changed or no limit is at 90% or more. |
-| 90% guard | The plugin's own rule (borrowed from Synara), so a reset is not wasted while plenty is left. Codex's own client lets you try any time and answers "does not need a reset". |
+| 90% guard | The plugin's own rule (borrowed from Synara; adjustable as `resetUnlockThreshold`), so a reset is not wasted while plenty is left. Codex's own client lets you try any time and answers "does not need a reset". |
 
 </details>
+
+## Settings
+
+Everything below is adjustable on the plugin's settings page (**Preferences**, collapsible, with **Reset to defaults**) or from the CLI. Out-of-range values are clamped, and red never starts below amber.
+
+| Key | Default | Range | What it does |
+| --- | --- | --- | --- |
+| `language` | `auto` | `auto` / `en` / `zh` | Interface language (see below) |
+| `warnThreshold` | `75` | 40–95 | Rings and bars turn amber at this % used |
+| `dangerThreshold` | `90` | 50–100, ≥ amber | Rings and bars turn red at this % used |
+| `resetUnlockThreshold` | `90` | 50–100 | A banked Codex reset can be used once a limit reaches this % used; the server re-checks it before every reset |
+| `antigravityEnabled` | `true` | on / off | Offer the built-in Antigravity source (`agy /usage`) |
+| `refreshIntervalMinutes` | `5` | 1–60 | How often usage is re-read in the background |
+| `defaultDetailsOpen` | `false` | on / off | Whether the hover card starts with Details open |
+| `hiddenProviders` | empty | provider ids, comma-separated | Rings hidden from the sidebar (the settings page still shows them) |
+
+```sh
+bb plugin config usage-rings                              # show all settings
+bb plugin config usage-rings set warnThreshold 60
+bb plugin config usage-rings set hiddenProviders codex
+bb plugin config usage-rings unset warnThreshold          # back to the default
+```
 
 ## Language
 

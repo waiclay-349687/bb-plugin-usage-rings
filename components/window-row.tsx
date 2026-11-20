@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 lib/usage 的配速与文案、lib/i18n 的时长与窗口名、hooks/use-language 的文案、lib/motion 的动效参数、hooks/use-motion 的 useAnimateIn / useReducedMotion
+ * [INPUT]: 依赖 hooks/use-preferences 的告警阈值; 依赖 lib/usage 的配速与文案、lib/i18n 的时长与窗口名、hooks/use-language 的文案、lib/motion 的动效参数、hooks/use-motion 的 useAnimateIn / useReducedMotion
  * [OUTPUT]: 对外提供 WindowRow: 一个额度窗口 = 标题行 (窗口名 · 已用% · 重置倒计时) + 整行宽 6px 进度条 (带匀速刻度) + 余量/结论行;
  *           title 可只给分组后的短名, animateFill 关掉从 0 填充
  * [POS]: components 的行原语, 悬浮卡片与设置页共用; 消费者: usage-card.tsx; 与 usage-card 的边界: 这里只画一个窗口;
@@ -11,6 +11,7 @@ import { formatSpan, localizeWindowName } from "../lib/i18n.ts";
 import { paceCopy, paceTone, usedTone, windowTitle, type Pace, type UsageWindow } from "../lib/usage.ts";
 import { cn } from "../lib/utils.ts";
 import { useI18n } from "../hooks/use-language.ts";
+import { usePreferences } from "../hooks/use-preferences.ts";
 import { useAnimateIn, useReducedMotion } from "../hooks/use-motion.ts";
 import { TONE_BG, TONE_TEXT } from "./tone.ts";
 
@@ -34,7 +35,8 @@ export function WindowRow({
   const shown = drawn || !animateFill;
   const reduced = useReducedMotion();
   const used = Math.min(100, Math.max(0, pace.usedPercent));
-  const tone = usedTone(used);
+  const { warnThreshold, dangerThreshold } = usePreferences();
+  const tone = usedTone(used, warnThreshold, dangerThreshold);
   const copy = paceCopy(pace, lang);
   const delay = index * DURATION.stagger;
   // 刻度 = 匀速时此刻应用到的位置, 填充越过它就是用快了

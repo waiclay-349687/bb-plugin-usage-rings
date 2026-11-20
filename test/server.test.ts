@@ -32,7 +32,7 @@ function sample(usedPercent: number) {
 }
 
 test("parseRateLimits reads credits and available resets, soonest expiry first", () => {
-  const account = parseRateLimits(sample(2), NOW);
+  const account = parseRateLimits(sample(2), NOW, 90);
   assert.equal(account.status, "ok");
   if (account.status !== "ok") return;
   assert.equal(account.accountId, "acct-1");
@@ -45,17 +45,22 @@ test("parseRateLimits reads credits and available resets, soonest expiry first",
   assert.equal(account.peakUsedPercent, 2);
 });
 
-test("resets become usable once a window is at 90% or more", () => {
-  assert.equal(canUseReset(sample(89)), false);
-  assert.equal(canUseReset(sample(90)), true);
-  assert.equal(canUseReset({ accountId: "x" }), undefined);
-  const nearlyOut = parseRateLimits(sample(93), NOW);
+test("resets become usable once a window reaches the configured threshold", () => {
+  assert.equal(canUseReset(sample(89), 90), false);
+  assert.equal(canUseReset(sample(90), 90), true);
+  assert.equal(canUseReset({ accountId: "x" }, 90), undefined);
+  const nearlyOut = parseRateLimits(sample(93), NOW, 90);
   assert.ok(nearlyOut.status === "ok" && nearlyOut.canUseReset);
+  // 门槛调低后, 同一份读数立即可用, 且下发的门槛跟着变
+  assert.equal(canUseReset(sample(60), 60), true);
+  const lowered = parseRateLimits(sample(60), NOW, 60);
+  assert.ok(lowered.status === "ok" && lowered.canUseReset && lowered.resetThresholdPercent === 60);
+  assert.equal(canUseReset(sample(95), 100), false);
 });
 
 test("parseRateLimits without an account is unavailable", () => {
-  assert.equal(parseRateLimits({ rateLimits: {} }, NOW).status, "unavailable");
-  assert.equal(parseRateLimits(null, NOW).status, "unavailable");
+  assert.equal(parseRateLimits({ rateLimits: {} }, NOW, 90).status, "unavailable");
+  assert.equal(parseRateLimits(null, NOW, 90).status, "unavailable");
 });
 
 test("tokenDelta turns cumulative totals into increments", () => {

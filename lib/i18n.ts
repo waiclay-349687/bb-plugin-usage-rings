@@ -133,6 +133,27 @@ export interface Messages {
   language: string;
   languageAuto: string;
   languageHint: string;
+  // 偏好面板与宿主设置页
+  preferences: string;
+  preferencesSummary: string;
+  warnThreshold: string;
+  dangerThreshold: string;
+  dangerHint: string;
+  resetUnlockThreshold: string;
+  resetUnlockHint: string;
+  antigravityEnabled: string;
+  antigravityHint: string;
+  refreshInterval: string;
+  minutes(n: number): string;
+  defaultDetailsOpen: string;
+  ringsShown: string;
+  ringsShownHint: string;
+  noProvidersYet: string;
+  resetDefaults: string;
+  on: string;
+  off: string;
+  configuration: string;
+  pluginDescription: string;
 }
 
 const en: Messages = {
@@ -207,6 +228,27 @@ const en: Messages = {
   language: "Language",
   languageAuto: "Auto",
   languageHint: "Auto follows bb's language.",
+  preferences: "Preferences",
+  preferencesSummary: "Colour thresholds, Codex reset guard, refresh, rings shown",
+  warnThreshold: "Amber from",
+  dangerThreshold: "Red from",
+  dangerHint: "Red never starts below amber.",
+  resetUnlockThreshold: "Codex reset unlocks at",
+  resetUnlockHint: "Checked again by the server before every reset.",
+  antigravityEnabled: "Antigravity source",
+  antigravityHint: "Reads the local agy CLI's usage; spends no tokens.",
+  refreshInterval: "Refresh every",
+  minutes: (n) => `${n} min`,
+  defaultDetailsOpen: "Open Details by default",
+  ringsShown: "Rings in the sidebar",
+  ringsShownHint: "Hidden rings still show on this page.",
+  noProvidersYet: "No provider has reported usage yet.",
+  resetDefaults: "Reset to defaults",
+  on: "On",
+  off: "Off",
+  configuration: "Configuration",
+  pluginDescription:
+    "Agent plan limits as rings at the bottom of the sidebar rail. Hover one for how much is used, when it resets, your pace, and Codex resets, credits and token totals.",
 };
 
 // 中文模式下, 后端或宿主给的英文原文 (错误信息等) 一律不显示, 换成中文的概括说法
@@ -282,6 +324,26 @@ const zh: Messages = {
   language: "语言",
   languageAuto: "自动",
   languageHint: "自动：跟随 BB 的界面语言。",
+  preferences: "偏好设置",
+  preferencesSummary: "告警阈值、Codex 重置保护、刷新间隔、显示哪些圆环",
+  warnThreshold: "橙色告警阈值",
+  dangerThreshold: "红色高危阈值",
+  dangerHint: "红色阈值不会低于橙色阈值。",
+  resetUnlockThreshold: "Codex 重置解锁阈值",
+  resetUnlockHint: "每次重置前，服务端都会按这个值再核对一次。",
+  antigravityEnabled: "Antigravity 采集源",
+  antigravityHint: "读取本机 Antigravity 命令行的用量，不消耗词元。",
+  refreshInterval: "自动刷新间隔",
+  minutes: (n) => `${n} 分钟`,
+  defaultDetailsOpen: "默认展开详情",
+  ringsShown: "侧边栏显示的圆环",
+  ringsShownHint: "隐藏的圆环仍会显示在本页。",
+  noProvidersYet: "还没有提供方上报用量。",
+  resetDefaults: "恢复默认",
+  on: "开",
+  off: "关",
+  configuration: "配置",
+  pluginDescription: "在侧边栏底部用圆环显示各个智能体的套餐限额。悬停查看已用多少、何时重置、配速，以及 Codex 的重置次数、额度点数和词元统计。",
 };
 
 export const MESSAGES: Record<Lang, Messages> = { en, zh };

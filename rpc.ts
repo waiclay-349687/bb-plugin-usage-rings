@@ -1,8 +1,8 @@
 /**
  * [INPUT]: 依赖 @get-bb/plugin-sdk 的 defineRpcContract、zod; 依赖 lib/usage-protocol 的 usageSchema (BB 用量协议的单个读数)
- * [OUTPUT]: 对外提供 rpcContract 与 TokenTotals / CodexAccount / ResetOutcome 类型: 前端 ↔ 后端的 RPC 契约 (limits / token_totals / codex_account / codex_use_reset / language / set_language)
+ * [OUTPUT]: 对外提供 rpcContract 与 TokenTotals / CodexAccount / ResetOutcome 类型: 前端 ↔ 后端的 RPC 契约 (limits / token_totals / codex_account / codex_use_reset / preferences / set_preferences / reset_preferences) 与 Preferences 线上形状
  * [POS]: 插件根的前后端共享契约 (前端需要运行时契约对象, 故不能留在 server.ts);
- *        消费者: server.ts (注册 handler)、hooks/use-usage-limits.ts (limits)、components/sections.tsx (读取与执行重置、token 统计)、components/rail-rings.tsx (预热)、hooks/use-language.ts (读写界面语言)
+ *        消费者: server.ts (注册 handler)、hooks/use-usage-limits.ts (limits)、components/sections.tsx (读取与执行重置、token 统计)、components/rail-rings.tsx (预热)、hooks/use-preferences.ts (读写全部偏好)
  * [PROTOCOL]: 变更时更新此头部,然后检查所在目录 CLAUDE.md
  */
 import { defineRpcContract } from "@get-bb/plugin-sdk";
@@ -10,6 +10,18 @@ import { z } from "zod";
 import { usageSchema } from "./lib/usage-protocol.ts";
 
 const languageSchema = z.enum(["auto", "en", "zh"]);
+
+/** 偏好的线上形状; 范围与联动校验在 lib/preferences.ts 的 normalizePreferences, 服务端写入前一律过它 */
+const preferencesSchema = z.object({
+  language: languageSchema,
+  warnThreshold: z.number(),
+  dangerThreshold: z.number(),
+  resetUnlockThreshold: z.number(),
+  antigravityEnabled: z.boolean(),
+  refreshIntervalMinutes: z.number(),
+  defaultDetailsOpen: z.boolean(),
+  hiddenProviders: z.array(z.string().max(200)).max(100),
+});
 
 const periodSchema = z.object({ tokens: z.number().min(0), sessions: z.number().int().min(0) });
 
@@ -64,9 +76,12 @@ export const rpcContract = defineRpcContract({
       .strict(),
     output: z.object({ outcome: z.enum(RESET_OUTCOMES) }),
   },
-  /** 界面语言设置 (auto / en / zh), 存在宿主的插件设置里, bb plugin config 改的是同一个值 */
-  language: { input: z.null(), output: z.object({ language: languageSchema }) },
-  set_language: { input: z.object({ language: languageSchema }).strict(), output: z.object({ language: languageSchema }) },
+  /** 全部偏好, 存在宿主插件设置里; bb plugin config usage-rings 改的是同一组值 */
+  preferences: { input: z.null(), output: preferencesSchema },
+  /** 只改给出的几项; 越界值被夹回范围, 红色阈值不低于橙色阈值 */
+  set_preferences: { input: preferencesSchema.partial().strict(), output: preferencesSchema },
+  /** 全部恢复默认 */
+  reset_preferences: { input: z.null(), output: preferencesSchema },
 });
 
 export type TokenTotals = z.infer<typeof tokenTotalsSchema>;

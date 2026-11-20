@@ -5,8 +5,8 @@ import { paceOf, paceCopy, type UsageWindow } from "../lib/usage.ts";
 
 const HOUR = 3_600_000;
 const HAN = /[一-鿿]/;
-/** 中文模式允许出现的拉丁字符: 品牌名与数量单位 (如 "23M") */
-const ZH_ALLOWED = /\b(?:Codex|BB)\b/g;
+/** 中文模式允许出现的拉丁字符: 品牌名 (Codex、BB、Antigravity) 与数量单位 (如 "23M") */
+const ZH_ALLOWED = /\b(?:Codex|BB|Antigravity)\b/g;
 
 /** 把一套文案里的每一条展开成实际会显示的字符串; 函数用该语言下真实会传入的参数调用 */
 function render(messages: Messages, lang: Lang): [string, string][] {
@@ -42,6 +42,7 @@ function render(messages: Messages, lang: Lang): [string, string][] {
         ringAria: ["Codex", "x"],
         ringLabel: [title, 42],
         cardAria: ["Codex"],
+        minutes: [5],
       };
       assert.ok(key in args, `test needs sample arguments for ${key}`);
       out.push([key, fn(...(args[key] ?? []))]);

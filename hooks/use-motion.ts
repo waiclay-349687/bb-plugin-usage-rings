@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖浏览器 matchMedia 与 localStorage
- * [OUTPUT]: 对外提供 useReducedMotion (系统"减少动态效果") / useAnimateIn (挂载两帧后变真, 用来从 0 过渡到目标值) / useDetailsOpen (记住 Details 展开状态, 所有卡片共享)
+ * [OUTPUT]: 对外提供 useReducedMotion (系统"减少动态效果") / useAnimateIn (挂载两帧后变真, 用来从 0 过渡到目标值) / useDetailsOpen (Details 开关: 手动开关后记住, 否则按偏好默认值; 所有卡片共享) / forgetDetailsOpen
  * [POS]: hooks 的交互状态层; 消费者: components/*; 与 lib/motion.ts 的边界: 这里只有状态, 参数在 lib/motion.ts
  * [PROTOCOL]: 变更时更新此头部,然后检查所在目录 CLAUDE.md
  */
@@ -42,24 +42,36 @@ export function useAnimateIn(): boolean {
 const DETAILS_KEY = "bb-plugin-usage-rings:details-open:v1";
 const listeners = new Set<() => void>();
 
-function readDetails(): boolean {
+/** "1" / "0" = 用户手动开关过; null = 没动过, 按偏好 defaultDetailsOpen */
+function readDetails(): string | null {
   try {
-    return localStorage.getItem(DETAILS_KEY) === "1";
+    return localStorage.getItem(DETAILS_KEY);
   } catch {
-    return false;
+    return null;
   }
 }
 
-/** Details 默认收起, 展开后记住 (Synara 的做法); 各提供方卡片与设置页共用一个状态 */
-export function useDetailsOpen(): [boolean, (open: boolean) => void] {
-  const open = useSyncExternalStore(
+/** 偏好里的"默认展开"改了: 忘掉手动开关的记录, 让新默认值立刻生效 */
+export function forgetDetailsOpen(): void {
+  try {
+    localStorage.removeItem(DETAILS_KEY);
+  } catch {
+    // 无妨
+  }
+  for (const listener of listeners) listener();
+}
+
+/** Details 开关: 手动开关后记住 (Synara 的做法), 没动过时按偏好的默认值; 各提供方卡片与设置页共用一个状态 */
+export function useDetailsOpen(defaultOpen: boolean): [boolean, (open: boolean) => void] {
+  const stored = useSyncExternalStore(
     (onChange) => {
       listeners.add(onChange);
       return () => listeners.delete(onChange);
     },
     readDetails,
-    () => false,
+    () => null,
   );
+  const open = stored === null ? defaultOpen : stored === "1";
   const setOpen = (next: boolean) => {
     try {
       localStorage.setItem(DETAILS_KEY, next ? "1" : "0");

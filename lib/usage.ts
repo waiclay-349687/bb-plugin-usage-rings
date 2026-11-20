@@ -168,9 +168,9 @@ export function paceCopy(pace: Pace, lang: Lang = "en"): { amount: string | null
   return { amount, outlook: pace.runsOutInMs === null ? null : t.runsOutIn(formatSpan(pace.runsOutInMs, lang)) };
 }
 
-/** 环与进度条填充色看用量: 用到 75% 琥珀、90% 红 (即 Synara 的剩 25% / 10%) */
-export function usedTone(usedPercent: number): Tone {
-  return usedPercent >= 90 ? "bad" : usedPercent >= 75 ? "warn" : "good";
+/** 环与进度条填充色看用量: 默认用到 75% 琥珀、90% 红 (即 Synara 的剩 25% / 10%), 两个阈值可在偏好里调 */
+export function usedTone(usedPercent: number, warn = 75, danger = 90): Tone {
+  return usedPercent >= danger ? "bad" : usedPercent >= warn ? "warn" : "good";
 }
 
 /** 配速刻度颜色看配速 */

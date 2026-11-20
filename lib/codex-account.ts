@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖本机 `codex` 命令行的 app-server (JSON-RPC over stdio): account/rateLimits/read、account/rateLimitResetCredit/consume
- * [OUTPUT]: 对外提供 createCodexAccount (read 读账号: credits 余额、可用重置及过期时间; consume 用掉一次重置) 与纯解析函数 parseRateLimits / canUseReset
+ * [OUTPUT]: 对外提供 createCodexAccount (read 读账号: credits 余额、可用重置及过期时间; consume 用掉一次重置; 解锁门槛每次现读偏好) 与纯解析函数 parseRateLimits / canUseReset / peakUsedPercent
  * [POS]: lib 的服务端适配层, 只在 server.ts 里用; 不读任何登录凭据, 全部经 Codex 官方接口;
  *        与 lib/usage.ts 的边界: 这里只管 Codex 账户附加信息, 额度窗口仍以 bb 的 usageLimits 为准
  * [PROTOCOL]: 变更时更新此头部,然后检查所在目录 CLAUDE.md
@@ -12,7 +12,6 @@ import { RESET_OUTCOMES } from "../rpc.ts";
 
 const APP_SERVER_TIMEOUT_MS = 20_000;
 const READ_CACHE_MS = 60_000;
-const RESET_THRESHOLD_PERCENT = 90;
 
 type Json = Record<string, unknown>;
 const asRecord = (value: unknown): Json | null => (value && typeof value === "object" && !Array.isArray(value) ? (value as Json) : null);
@@ -36,15 +35,15 @@ export function peakUsedPercent(json: unknown): number | null {
 }
 
 /**
- * 本插件的保护门槛 (沿用 Synara): 某个窗口用到 90% 以上才允许用重置, 避免额度还很充足时把重置浪费掉。
+ * 本插件的保护门槛 (沿用 Synara, 默认 90%, 可在偏好里调): 某个窗口用到门槛以上才允许用重置, 避免额度还很充足时把重置浪费掉。
  * Codex 官方界面不预先拦截, 由服务端判断; 这里更保守。读不到窗口时返回 undefined。
  */
-export function canUseReset(json: unknown): boolean | undefined {
+export function canUseReset(json: unknown, threshold: number): boolean | undefined {
   const peak = peakUsedPercent(json);
-  return peak === null ? undefined : peak >= RESET_THRESHOLD_PERCENT;
+  return peak === null ? undefined : peak >= threshold;
 }
 
-export function parseRateLimits(json: unknown, now: number): CodexAccount {
+export function parseRateLimits(json: unknown, now: number, threshold: number): CodexAccount {
   const root = asRecord(json);
   const accountId = asString(root?.accountId);
   if (!root || !accountId) return { status: "unavailable", message: "Codex did not report an account." };
@@ -78,9 +77,9 @@ export function parseRateLimits(json: unknown, now: number): CodexAccount {
     accountId,
     credits,
     resets,
-    canUseReset: canUseReset(json) === true,
-    // 门槛与当前用量一起下发, 前端按钮文案只引用这里的数, 不另写一份 90
-    resetThresholdPercent: RESET_THRESHOLD_PERCENT,
+    canUseReset: canUseReset(json, threshold) === true,
+    // 门槛与当前用量一起下发, 前端按钮文案只引用这里的数, 不另写一份
+    resetThresholdPercent: threshold,
     peakUsedPercent: peakUsedPercent(json),
     fetchedAt: now,
   };
@@ -153,27 +152,35 @@ async function withAppServer<T>(run: (request: Request) => Promise<T>): Promise<
   }
 }
 
-export function createCodexAccount() {
-  let cached: CodexAccount | null = null;
-  let inFlight: Promise<CodexAccount> | null = null;
+/** threshold: 每次读取与执行前现取的解锁门槛 (偏好 resetUnlockThreshold) */
+export function createCodexAccount(threshold: () => Promise<number>) {
+  // 缓存原始响应而不是解析结果: 门槛改了不必重新拉取, 下次读取按新门槛重算
+  let cached: { json: unknown; fetchedAt: number } | null = null;
+  let inFlight: Promise<{ json: unknown; fetchedAt: number }> | null = null;
   const activeResets = new Map<string, { key: string; promise: Promise<ResetOutcome> }>();
 
   async function read(refresh: boolean): Promise<CodexAccount> {
-    if (!refresh && cached?.status === "ok" && Date.now() - cached.fetchedAt < READ_CACHE_MS) return cached;
-    if (inFlight) return inFlight;
-    inFlight = withAppServer((request) => request("account/rateLimits/read", {}))
-      .then((json) => (cached = parseRateLimits(json, Date.now())))
-      .catch((error: unknown): CodexAccount => ({
-        status: "unavailable",
-        message: error instanceof Error ? error.message : "Codex usage could not be read.",
-      }))
-      .finally(() => (inFlight = null));
-    return inFlight;
+    const limit = await threshold();
+    if (!refresh && cached && Date.now() - cached.fetchedAt < READ_CACHE_MS) return parseRateLimits(cached.json, Date.now(), limit);
+    try {
+      inFlight ??= withAppServer((request) => request("account/rateLimits/read", {}))
+        .then((json) => {
+          const fresh = { json, fetchedAt: Date.now() };
+          // 没解析出账号的响应不进缓存, 下次重新读
+          if (parseRateLimits(json, fresh.fetchedAt, limit).status === "ok") cached = fresh;
+          return fresh;
+        })
+        .finally(() => (inFlight = null));
+      const { json } = await inFlight;
+      return parseRateLimits(json, Date.now(), limit);
+    } catch (error) {
+      return { status: "unavailable", message: error instanceof Error ? error.message : "Codex usage could not be read." };
+    }
   }
 
   /**
    * 用掉一次重置。客户端为每次确认生成幂等键并持久化, 结果不明时只能用同一个键重试, 不会重复扣。
-   * 执行前重新读取: 账号变了或已不满足 90% 规则就不扣。
+   * 执行前重新读取: 账号变了或已不满足解锁门槛就不扣。
    */
   async function consume(input: { accountId: string; idempotencyKey: string; creditId?: string }): Promise<ResetOutcome> {
     const active = activeResets.get(input.accountId);
@@ -186,7 +193,7 @@ export function createCodexAccount() {
       if (asString(asRecord(usage)?.accountId) !== input.accountId) {
         throw new Error("The Codex account changed. Refresh usage before using a reset.");
       }
-      const allowed = canUseReset(usage);
+      const allowed = canUseReset(usage, await threshold());
       if (allowed === undefined) throw new Error("Current Codex usage is unavailable. Retry the same attempt.");
       if (!allowed) return "nothingToReset" as const;
       const result = asRecord(

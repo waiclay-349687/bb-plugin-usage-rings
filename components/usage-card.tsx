@@ -16,6 +16,7 @@ import { formatSpan, localizeWindowName, type Lang, type Messages } from "../lib
 import { groupWindows, paceOf, type ProviderUsage } from "../lib/usage.ts";
 import { cn } from "../lib/utils.ts";
 import { useI18n } from "../hooks/use-language.ts";
+import { usePreferences } from "../hooks/use-preferences.ts";
 import { useDetailsOpen, useReducedMotion } from "../hooks/use-motion.ts";
 import { CardSection } from "./card-section.tsx";
 import { Collapse } from "./collapse.tsx";
@@ -58,7 +59,7 @@ export function UsageCard({ usage, provider, now, updatedAt, error, refreshing, 
       : usage.staleMessage === undefined ? null : t.staleNote(usage.staleMessage);
   const stale = usage.status === "ok" && usage.staleMessage !== undefined;
   const showPlan = usage.planLabel !== null && !provider.name.toLowerCase().includes(usage.planLabel.toLowerCase());
-  const [detailsOpen, setDetailsOpen] = useDetailsOpen();
+  const [detailsOpen, setDetailsOpen] = useDetailsOpen(usePreferences().defaultDetailsOpen);
   const reduced = useReducedMotion();
   const codex = usage.providerId === "codex";
 

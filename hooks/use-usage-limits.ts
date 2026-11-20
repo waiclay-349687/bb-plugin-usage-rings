@@ -10,8 +10,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { experimental_useRpcRefresh, useRpc } from "@get-bb/plugin-sdk/app";
 import { mergeLastKnown, normalizeUsage, type ProviderUsage } from "../lib/usage.ts";
 import type { rpcContract } from "../rpc.ts";
+import { usePreferences } from "./use-preferences.ts";
 
-const POLL_MS = 5 * 60_000;
 /** 窗口重新可见时, 数据旧于该值才重拉 */
 const STALE_ON_FOCUS_MS = 2 * 60_000;
 
@@ -30,6 +30,8 @@ export function useUsageLimits(): UsageLimitsState {
   // 客户端对象未必跨渲染稳定; 放进 ref, 轮询与监听只在挂载时启动一次
   const rpc = useRpc<typeof rpcContract>();
   const rpcRef = useRef(rpc);
+  // 自动重读间隔来自偏好 refreshIntervalMinutes (1-60 分钟)
+  const pollMs = usePreferences().refreshIntervalMinutes * 60_000;
   rpcRef.current = rpc;
   // BB 的 RPC 查询缓存到被作废为止; 不跟着额度一起作废, 重置次数与 token 统计会停在页面打开那一刻
   const queries = experimental_useRpcRefresh();
@@ -58,7 +60,7 @@ export function useUsageLimits(): UsageLimitsState {
         if (controller.signal.aborted) return;
         const now = Date.now();
         setProviders((previous) => mergeLastKnown(previous, normalizeUsage(raw)));
-        // 首次读取时分区数据刚预热过, 之后每次 (5 分钟轮询或手动刷新) 都让它们重新取
+        // 首次读取时分区数据刚预热过, 之后每次 (定时轮询或手动刷新) 都让它们重新取
         if (loadedOnce.current) queriesRef.current.refresh();
         loadedOnce.current = true;
         setUpdatedAt(now);
@@ -79,7 +81,7 @@ export function useUsageLimits(): UsageLimitsState {
 
   useEffect(() => {
     void load(false);
-    const timer = window.setInterval(() => void load(false), POLL_MS);
+    const timer = window.setInterval(() => void load(false), pollMs);
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       const last = updatedAtRef.current;
@@ -94,7 +96,7 @@ export function useUsageLimits(): UsageLimitsState {
       inFlight.current?.abort();
       inFlight.current = null;
     };
-  }, [load]);
+  }, [load, pollMs]);
 
   const refresh = useCallback(() => void load(true), [load]);
   return { providers, updatedAt, error, refreshing, refresh };
