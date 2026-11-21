@@ -1,3 +1,12 @@
+> [!IMPORTANT]
+> **This repository has moved to [waiclay-349687/bb-plugins](https://github.com/waiclay-349687/bb-plugins/tree/main/plugins/usage-rings) and is archived (read-only).** New releases, issues and pull requests live there, in `plugins/usage-rings`. Install from the monorepo:
+>
+> ```sh
+> bb plugin install git:https://github.com/waiclay-349687/bb-plugins.git --plugin usage-rings --yes
+> ```
+>
+> Installed from a local clone of this repository? Clone bb-plugins and run `bb plugin install "path:$PWD" --plugin usage-rings --yes` in its root. bb moves the plugin to the new folder and keeps its settings.
+
 # Usage Rings for bb
 
 > **English** | [简体中文](README.zh-CN.md)

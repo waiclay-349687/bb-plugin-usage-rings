@@ -1,3 +1,12 @@
+> [!IMPORTANT]
+> **本仓库已迁移到 [waiclay-349687/bb-plugins](https://github.com/waiclay-349687/bb-plugins/tree/main/plugins/usage-rings)，并已归档（只读）。** 新版本、问题与合并请求都在那里的 `plugins/usage-rings` 目录。从单仓库安装：
+>
+> ```sh
+> bb plugin install git:https://github.com/waiclay-349687/bb-plugins.git --plugin usage-rings --yes
+> ```
+>
+> 之前从本仓库的本地克隆安装？克隆 bb-plugins，在仓库根目录运行 `bb plugin install "path:$PWD" --plugin usage-rings --yes`，bb 会把插件迁到新目录并保留设置。
+
 # Usage Rings（bb 额度圆环插件）
 
 > [English](README.md) | **简体中文**
